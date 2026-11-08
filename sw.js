@@ -3,8 +3,8 @@
 // - Hashed assets, icons, recipe photos: cache first (photos are added as they're viewed, plus this week's
 //   dinners, which the app sends with a "warm" message so the week's photos work offline).
 // - A photo that can't be fetched fails as an error (the app then draws its placeholder); it never gets HTML back.
-const CACHE = 'sameplate-beta-v0.1.1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'sameplate-beta-v0.1.2';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './qr.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
