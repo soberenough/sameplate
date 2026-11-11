@@ -1,4 +1,4 @@
-// SamePlate beta service worker.
+// SamePan beta service worker.
 // - Pages (index.html): network first, so a new build shows up; the cached copy is the offline fallback.
 // - Hashed assets, icons, recipe photos: cache first (photos are added as they're viewed, plus this week's
 //   dinners, which the app sends with a "warm" message so the week's photos work offline).
@@ -40,11 +40,11 @@ self.addEventListener('message', (e) => {
   }));
 });
 
-// Reminders sent by the SamePlate server (only when the app was built with a server; see src/api.ts).
+// Reminders sent by the SamePan server (only when the app was built with a server; see src/api.ts).
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'SamePlate', {
+  e.waitUntil(self.registration.showNotification(d.title || 'SamePan', {
     body: d.body || '', tag: d.tag || 'sameplate', icon: './icon-192.png', badge: './icon-192.png', data: { url: d.url || './' },
   }));
 });

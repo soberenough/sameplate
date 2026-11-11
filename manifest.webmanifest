@@ -1,6 +1,6 @@
 {
-  "name": "SamePlate (beta)",
-  "short_name": "SamePlate",
+  "name": "SamePan (beta)",
+  "short_name": "SamePan",
   "description": "One dinner everyone eats, under your budget.",
   "start_url": "./",
   "scope": "./",
