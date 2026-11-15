@@ -1,0 +1,17 @@
+{
+  "_about": "Public event calendars (iCalendar .ics) read by server/feeds.py. Keys of 'areas' are 3-digit ZIP prefixes; each lists feed ids. Add a city: add its feeds under 'feeds' and its ZIP prefixes under 'areas'. 'hint' is optional: 'kids' (the whole calendar is for families) or 'date' (arts and culture). Free and kid-friendly are otherwise read from each event's own text. Verified 2026-11-14.",
+  "feeds": {
+    "norfolk_community": {"name": "City of Norfolk: Community & Neighborhood", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=75&feed=calendar", "tz": "America/New_York", "page": "https://norfolk.gov/calendar.aspx?CID=75"},
+    "norfolk_arts_culture": {"name": "City of Norfolk: Arts & Culture", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=24&feed=calendar", "tz": "America/New_York", "hint": "date", "page": "https://norfolk.gov/calendar.aspx"},
+    "norfolk_arts": {"name": "Norfolk Arts", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=166&feed=calendar", "tz": "America/New_York", "hint": "date", "page": "https://norfolk.gov/calendar.aspx"},
+    "norfolk_library": {"name": "Norfolk Public Library", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=148&feed=calendar", "tz": "America/New_York", "page": "https://norfolk.gov/calendar.aspx"},
+    "norfolk_slover": {"name": "The Slover (library)", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=147&feed=calendar", "tz": "America/New_York", "page": "https://norfolk.gov/calendar.aspx"},
+    "norfolk_parks_rec": {"name": "Norfolk Parks and Rec", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=163&feed=calendar", "tz": "America/New_York", "page": "https://norfolk.gov/calendar.aspx"},
+    "norfolk_zoo": {"name": "Virginia Zoo (City of Norfolk calendar)", "url": "https://norfolk.gov/common/modules/iCalendar/iCalendar.aspx?catID=164&feed=calendar", "tz": "America/New_York", "page": "https://norfolk.gov/calendar.aspx"}
+  },
+  "areas": {
+    "233": ["norfolk_community", "norfolk_arts_culture", "norfolk_arts", "norfolk_library", "norfolk_slover", "norfolk_parks_rec", "norfolk_zoo"],
+    "234": ["norfolk_community", "norfolk_arts_culture", "norfolk_arts", "norfolk_library", "norfolk_slover", "norfolk_parks_rec", "norfolk_zoo"],
+    "235": ["norfolk_community", "norfolk_arts_culture", "norfolk_arts", "norfolk_library", "norfolk_slover", "norfolk_parks_rec", "norfolk_zoo"]
+  }
+}

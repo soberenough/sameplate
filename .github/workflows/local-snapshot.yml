@@ -1,0 +1,36 @@
+# Daily "Events near you" files for the GitHub Pages site (no SamePlate server needed).
+# Source: soberenough/cutline money-meals/local-snapshot (copied here by sync_to_pages.sh).
+name: Local events snapshot
+on:
+  schedule:
+    - cron: "17 10 * * *"   # about 5:17 AM Eastern
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: local-snapshot
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test
+        run: python -m unittest discover -s tools/local-snapshot -p 'test_*.py' -v
+      - name: Build local/*.json
+        env:
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}   # optional; without it, Ticketmaster is skipped
+        run: python tools/local-snapshot/snapshot.py --out local
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add local
+          if git diff --cached --quiet; then echo "Nothing changed."; exit 0; fi
+          git commit -q -m "Local events snapshot $(TZ=America/New_York date +%F)"
+          for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0; sleep 10; done
+          exit 1
