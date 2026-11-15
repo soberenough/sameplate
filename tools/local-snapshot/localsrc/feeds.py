@@ -130,3 +130,26 @@ def feed_events(parsed: list[dict], feed: dict, day: date, days: int = 7) -> lis
                     "priceMin": None, "priceMax": None, "currency": None, "image": None,
                     "tags": tags_for(text, feed.get("hint")), "source": "feed", "sourceName": feed["name"]})
     return out
+
+
+def dedupe_events(evs: list[dict]) -> list[dict]:
+    """One event listed on several calendars (a city's Arts and Community calendars often share events) shows once:
+    same name, date and time. Tags are merged, except that "kids" never stays beside "adults"."""
+    out, by = [], {}
+    for e in evs:
+        k = (" ".join(str(e.get("name") or "").lower().split()), e.get("date"), (e.get("time") or "")[:5])
+        if k not in by:
+            by[k] = {**e, "tags": list(e.get("tags") or [])}
+            out.append(by[k])
+            continue
+        cur = by[k]
+        tags = list(dict.fromkeys(cur["tags"] + list(e.get("tags") or [])))
+        if "adults" in tags:
+            tags = [t for t in tags if t != "kids"]
+        cur["tags"] = tags
+        if "free" in tags:
+            cur["price"] = "free"
+        for f in ("url", "venue", "image"):
+            if not cur.get(f) and e.get(f):
+                cur[f] = e[f]
+    return out

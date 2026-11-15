@@ -149,6 +149,11 @@ class SnapshotTests(unittest.TestCase):
         self.assertFalse(any("overpass" in c for c in net.calls))
         self.assertNotIn("235.places.json", written)
 
+    def test_an_event_on_several_city_calendars_shows_once(self):
+        S.run(self.out, ["235"], TODAY, builder(Net()))   # every Norfolk calendar returns the same fixture
+        names = [e["name"] for e in self.read("235.json")["events"]]
+        self.assertEqual(len(names), len(set(names)))
+
     def test_unchanged_data_writes_nothing(self):
         S.run(self.out, ["235"], TODAY, builder(Net()))
         self.assertEqual(S.run(self.out, ["235"], TODAY, builder(Net())), [])

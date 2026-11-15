@@ -15,7 +15,7 @@ Ticketmaster. No key → events are simply left out.
 ZIP centroids: data/zip_centroids.csv.gz, from the BSD-licensed "zipcodes" npm package (see ZIP_CENTROIDS_LICENSE.txt).
 """
 import gzip
-from .feeds import feed_events, feeds_for, parse_ics, tags_for
+from .feeds import dedupe_events, feed_events, feeds_for, parse_ics, tags_for
 import json
 import math
 import os
@@ -347,7 +347,7 @@ class Local:
     def events(self, zip_code: str, day: date) -> tuple[list[dict], dict]:
         tm, tm_note = self.ticketmaster(zip_code, day)
         cal, used = self.calendars(zip_code, day)
-        evs = list(tm or []) + cal
+        evs = dedupe_events(list(tm or []) + cal)
         evs.sort(key=lambda e: ("free" not in e.get("tags", []), e.get("date") or "", e.get("time") or "99:99"))
         return evs, {"ticketmaster": tm_note, "calendars": used}
 

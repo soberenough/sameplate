@@ -13,7 +13,7 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,7 +24,7 @@ jobs:
       - name: Build local/*.json
         env:
           TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}   # optional; without it, Ticketmaster is skipped
-        run: python tools/local-snapshot/snapshot.py --out local
+        run: python -u tools/local-snapshot/snapshot.py --out local
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"

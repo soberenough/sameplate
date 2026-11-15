@@ -26,7 +26,9 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -50,6 +52,20 @@ OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.ku
 MAX_PLACES = 2500
 TM_SIZE = 100
 FORMAT = 1
+
+
+def overpass_http(method: str, url: str, headers: dict, data: bytes | None):
+    """Like local.http, but waits up to 150 s: an Overpass query may run 90 s on their side (the server's 30 s is
+    for a request a family is waiting on)."""
+    req = urllib.request.Request(url, data=data, method=method, headers={"User-Agent": local.UA, **headers})
+    try:
+        with urllib.request.urlopen(req, timeout=150) as r:
+            raw = r.read()
+            return r.status, (json.loads(raw) if raw else None)
+    except urllib.error.HTTPError as e:
+        return e.code, None
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return 599, None
 
 
 def bbox_query(bbox: tuple[float, float, float, float]) -> str:
@@ -86,9 +102,10 @@ def strip_volatile(d: dict | None) -> dict | None:
 
 
 class Builder:
-    def __init__(self, today: date, tm_key: str = "", http=None, http_text=None, sleep=time.sleep, log=print):
+    def __init__(self, today: date, tm_key: str = "", http=None, http_text=None, sleep=time.sleep, log=print, osm_http=None):
         self.today, self.tm_key = today, tm_key
         self.http = http or local.http
+        self.osm_http = osm_http or (http if http else overpass_http)
         self.http_text = http_text or local.http_text
         self.sleep, self.log = sleep, log
         self._feed_cache: dict[str, list[dict] | None] = {}
@@ -105,8 +122,8 @@ class Builder:
         for group in clusters(cents):
             q = bbox_query(bbox_of(group))
             st, body = 0, None
-            for attempt, url in enumerate(OVERPASS_URLS * 2):
-                st, body = self.http("POST", url, {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+            for url in OVERPASS_URLS:
+                st, body = self.osm_http("POST", url, {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
                                      urllib.parse.urlencode({"data": q}).encode())
                 self.sleep(5 if st == 200 else 20)  # be polite: one query at a time, a pause between, longer after a refusal
                 if st == 200 and isinstance(body, dict):
@@ -192,7 +209,7 @@ class Builder:
         places, places_at = self.places(cents, prev_places, failed)
         cal, used = self.calendars(zip3, prev, failed)
         tm, tm_note = self.ticketmaster(cents, failed)
-        evs = tm + cal
+        evs = feeds.dedupe_events(tm + cal)
         evs = [e for e in evs if e.get("date") and self.today.isoformat() <= e["date"] <= (self.today + timedelta(days=EVENT_DAYS)).isoformat()]
         evs.sort(key=lambda e: (e.get("date") or "", e.get("time") or "99:99", e.get("name") or ""))
         attribution = {"osm": "© OpenStreetMap contributors", "osmUrl": "https://www.openstreetmap.org/copyright",
