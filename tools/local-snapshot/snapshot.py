@@ -44,6 +44,9 @@ PLACES_MAX_AGE_DAYS = 7
 BBOX_MARGIN = 0.12                             # degrees (~8 miles) around a cluster's ZIPs
 CLUSTER_DEG = 0.3                              # ZIPs are grouped into ~20-mile squares: one Overpass query each
 PER_KIND_PER_CLUSTER = 60
+# The main Overpass instance first; public mirrors if it refuses (busy, or shared cloud IPs are throttled).
+OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
+                 "https://overpass.private.coffee/api/interpreter"]
 MAX_PLACES = 2500
 TM_SIZE = 100
 FORMAT = 1
@@ -101,9 +104,14 @@ class Builder:
         out, seen = [], set()
         for group in clusters(cents):
             q = bbox_query(bbox_of(group))
-            st, body = self.http("POST", local.OVERPASS, {"Content-Type": "application/x-www-form-urlencoded"},
-                                 urllib.parse.urlencode({"data": q}).encode())
-            self.sleep(5)  # be polite: one query at a time, a pause between
+            st, body = 0, None
+            for attempt, url in enumerate(OVERPASS_URLS * 2):
+                st, body = self.http("POST", url, {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+                                     urllib.parse.urlencode({"data": q}).encode())
+                self.sleep(5 if st == 200 else 20)  # be polite: one query at a time, a pause between, longer after a refusal
+                if st == 200 and isinstance(body, dict):
+                    break
+                self.log(f"  overpass {url.split('/')[2]}: HTTP {st}")
             if st != 200 or not isinstance(body, dict):
                 failed.append("openstreetmap")
                 return (prev_places or []), (prev_at or "")

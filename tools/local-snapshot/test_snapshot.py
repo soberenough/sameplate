@@ -42,7 +42,7 @@ class Net:
 
     def http(self, method, url, headers, data):
         self.calls.append(url)
-        if "overpass" in url:
+        if "overpass" in url or "interpreter" in url:
             return self.overpass
         if "ticketmaster" in url:
             return self.tm
