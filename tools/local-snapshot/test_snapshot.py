@@ -137,6 +137,7 @@ class SnapshotTests(unittest.TestCase):
         self.assertIn("ticketmaster", d["sourcesFailed"])
         self.assertEqual(d["ticketmaster"], "unavailable")
         self.assertGreater(len(pl2["places"]), 0)                       # kept
+        self.assertTrue(pl2["incomplete"])                               # and tried again tomorrow
         names = [e["name"] for e in d["events"]]
         self.assertIn("Holiday Concert in the Park", names)              # calendar events kept
         self.assertNotIn("Disney on Ice", names)                         # Ticketmaster never kept
@@ -153,6 +154,32 @@ class SnapshotTests(unittest.TestCase):
         S.run(self.out, ["235"], TODAY, builder(Net()))   # every Norfolk calendar returns the same fixture
         names = [e["name"] for e in self.read("235.json")["events"]]
         self.assertEqual(len(names), len(set(names)))
+
+    def test_one_failed_square_keeps_its_old_places_and_retries_tomorrow(self):
+        S.run(self.out, ["233"], TODAY, builder(Net()))
+        first = self.read("233.places.json")
+        self.assertFalse(first["incomplete"])
+        groups = S.clusters(S.area_centroids("233"))
+        self.assertGreater(len(groups), 2)
+        calls = {"n": 0}
+
+        def flaky(method, url, headers, data):   # the first square fails on every mirror, the rest answer
+            calls["n"] += 1
+            return (502, None) if calls["n"] <= len(S.OVERPASS_URLS) else (200, OVERPASS)
+        pl = dict(first)
+        pl["placesAsOf"] = "2026-11-01"
+        (self.out / "233.places.json").write_text(json.dumps(pl))
+        b = S.Builder(date(2026, 11, 21), "", http=Net().http, http_text=Net().text, sleep=lambda s: None, log=lambda *a: None, osm_http=flaky)
+        S.run(self.out, ["233"], date(2026, 11, 21), b)
+        second = self.read("233.places.json")
+        self.assertTrue(second["incomplete"])
+        self.assertEqual(second["placesAsOf"], "2026-11-21")
+        self.assertEqual({p["name"] for p in second["places"]}, {p["name"] for p in first["places"]})
+        # next day: incomplete → asked again even though it is fresh
+        net = Net()
+        S.run(self.out, ["233"], date(2026, 11, 22), builder(net))
+        self.assertTrue(any("interpreter" in c for c in net.calls))
+        self.assertFalse(self.read("233.places.json")["incomplete"])
 
     def test_unchanged_data_writes_nothing(self):
         S.run(self.out, ["235"], TODAY, builder(Net()))

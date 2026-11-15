@@ -40,12 +40,13 @@ except ImportError:  # the source tree (money-meals/local-snapshot next to money
     sys.path.insert(0, str(HERE.parent / "backend"))
     from server import feeds, local  # type: ignore
 
-AREAS = ["233", "234", "235", "236", "237"]   # Hampton Roads
+AREAS = ["235", "233", "234", "236", "237"]   # Hampton Roads (Norfolk first: it gets the run's Overpass time first)
 EVENT_DAYS = 30
 PLACES_MAX_AGE_DAYS = 7
-BBOX_MARGIN = 0.12                             # degrees (~8 miles) around a cluster's ZIPs
-CLUSTER_DEG = 0.3                              # ZIPs are grouped into ~20-mile squares: one Overpass query each
-PER_KIND_PER_CLUSTER = 60
+BBOX_MARGIN = 0.08                             # degrees (~5 miles) around a square's ZIPs
+CLUSTER_DEG = 0.2                              # ZIPs are grouped into ~13-mile squares: one Overpass query each
+PER_KIND_PER_CLUSTER = 40
+RUN_BUDGET_S = 35 * 60                         # stop querying Overpass after this; the rest waits for tomorrow
 # The main Overpass instance first; public mirrors if it refuses (busy, or shared cloud IPs are throttled).
 OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
                  "https://overpass.private.coffee/api/interpreter"]
@@ -74,7 +75,7 @@ def bbox_query(bbox: tuple[float, float, float, float]) -> str:
     for filters, _, _ in local.KINDS.values():
         for f in filters:
             parts.append(f'nwr[{f}]["name"]({s:.4f},{w:.4f},{n:.4f},{e:.4f});')
-    return "[out:json][timeout:90];(" + "".join(parts) + f");out center tags {MAX_PLACES * 2};"
+    return "[out:json][timeout:120];(" + "".join(parts) + f");out center tags {MAX_PLACES * 2};"
 
 
 def area_centroids(zip3: str) -> dict[str, list[float]]:
@@ -106,32 +107,45 @@ class Builder:
         self.today, self.tm_key = today, tm_key
         self.http = http or local.http
         self.osm_http = osm_http or (http if http else overpass_http)
+        self.deadline = time.monotonic() + RUN_BUDGET_S
         self.http_text = http_text or local.http_text
         self.sleep, self.log = sleep, log
         self._feed_cache: dict[str, list[dict] | None] = {}
 
     # -------------------------------------------------------------- sources
-    def places(self, cents: dict[str, list[float]], prev: dict | None, failed: list[str]) -> tuple[list[dict], str]:
-        """prev: the previous <zip3>.places.json."""
+    def places(self, cents: dict[str, list[float]], prev: dict | None, failed: list[str]) -> tuple[list[dict], str, bool]:
+        """prev: the previous <zip3>.places.json. → (places, placesAsOf, incomplete).
+        One query per small square. A square that fails keeps the previous run's places inside it, and the area is
+        marked incomplete so the next daily run tries again (a complete area is refreshed weekly)."""
         prev_places, prev_at = (prev or {}).get("places"), (prev or {}).get("placesAsOf")
-        if prev_places is not None and prev_at:
+        if prev_places is not None and prev_at and not (prev or {}).get("incomplete"):
             age = (self.today - date.fromisoformat(prev_at[:10])).days
             if 0 <= age < PLACES_MAX_AGE_DAYS:
-                return prev_places, prev_at
-        out, seen = [], set()
+                return prev_places, prev_at, False
+        out, seen, bad = [], set(), 0
         for group in clusters(cents):
-            q = bbox_query(bbox_of(group))
-            st, body = 0, None
-            for url in OVERPASS_URLS:
-                st, body = self.osm_http("POST", url, {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
-                                     urllib.parse.urlencode({"data": q}).encode())
-                self.sleep(5 if st == 200 else 20)  # be polite: one query at a time, a pause between, longer after a refusal
-                if st == 200 and isinstance(body, dict):
-                    break
-                self.log(f"  overpass {url.split('/')[2]}: HTTP {st}")
-            if st != 200 or not isinstance(body, dict):
-                failed.append("openstreetmap")
-                return (prev_places or []), (prev_at or "")
+            box = bbox_of(group)
+            body = None
+            if time.monotonic() < self.deadline:
+                q = bbox_query(box)
+                for url in OVERPASS_URLS:
+                    st, body = self.osm_http("POST", url, {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+                                             urllib.parse.urlencode({"data": q}).encode())
+                    self.sleep(3 if st == 200 else 30)  # one query at a time, a pause between, longer after a refusal
+                    if st == 200 and isinstance(body, dict):
+                        break
+                    self.log(f"  overpass {url.split('/')[2]}: HTTP {st}")
+                    body = None
+            if body is None:
+                bad += 1
+                s, w, n, e = box
+                kept = [p for p in (prev_places or []) if s <= p["lat"] <= n and w <= p["lon"] <= e]
+                for p in kept:
+                    key = (p["name"].lower(), p["kind"], round(p["lat"], 3), round(p["lon"], 3))
+                    if key not in seen:
+                        seen.add(key)
+                        out.append(p)
+                continue
             pts = list(group.values())
             mid = (sum(c[0] for c in pts) / len(pts), sum(c[1] for c in pts) / len(pts))
             near = []
@@ -148,8 +162,11 @@ class Builder:
                 seen.add(key)
                 per[p["kind"]] = per.get(p["kind"], 0) + 1
                 out.append(p)
+        if bad:
+            failed.append("openstreetmap")
         out.sort(key=lambda p: (p["kind"], p["name"].lower()))
-        return out[:MAX_PLACES], self.today.isoformat()
+        at = self.today.isoformat() if out or not prev_at else prev_at
+        return out[:MAX_PLACES], at, bad > 0
 
     def _feed(self, fid: str, feed: dict) -> list[dict] | None:
         if fid not in self._feed_cache:
@@ -206,7 +223,7 @@ class Builder:
             self.log(f"{zip3}: no ZIPs, skipped")
             return None
         failed: list[str] = []
-        places, places_at = self.places(cents, prev_places, failed)
+        places, places_at, incomplete = self.places(cents, prev_places, failed)
         cal, used = self.calendars(zip3, prev, failed)
         tm, tm_note = self.ticketmaster(cents, failed)
         evs = feeds.dedupe_events(tm + cal)
@@ -218,7 +235,7 @@ class Builder:
                "eventsFrom": self.today.isoformat(), "eventDays": EVENT_DAYS, "placesFile": f"{zip3}.places.json",
                "placesAsOf": places_at, "centroids": cents, "events": evs, "calendars": used, "ticketmaster": tm_note,
                "sourcesFailed": sorted(set(failed)), "attribution": attribution}
-        pl = {"v": FORMAT, "zip3": zip3, "placesAsOf": places_at, "places": places, "attribution": attribution}
+        pl = {"v": FORMAT, "zip3": zip3, "placesAsOf": places_at, "incomplete": incomplete, "places": places, "attribution": attribution}
         validate(out, pl, self.today)
         self.log(f"{zip3}: {len(places)} places, {len(evs)} events ({len(tm)} Ticketmaster), failed: {out['sourcesFailed'] or 'none'}")
         return out, pl
