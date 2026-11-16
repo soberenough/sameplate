@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SamePlate has moved</title>
+<!-- Not linked from anywhere yet. The build fills  from VITE_MOVED_TO (empty = not moving).
+     Families who already use SamePlate on this phone must open the app at THIS address once to carry their plan
+     over (the "Move my family's plan" banner); a plain redirect would leave their plan behind. -->
+<style>
+  body { font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #FFF8EE; color: #2B2B2B; }
+  main { max-width: 30rem; margin: 12vh auto; padding: 0 20px; text-align: center; }
+  h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
+  .btn { display: block; margin: 12px auto; padding: 14px 18px; border-radius: 12px; text-decoration: none; font-weight: 600; max-width: 20rem; }
+  .primary { background: #E2572B; color: #fff; }
+  .ghost { border: 2px solid #E2572B; color: #B23E17; }
+  .small { font-size: 14px; color: #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1 data-en="SamePlate has a new home" data-es="SamePlate tiene una nueva dirección">SamePlate has a new home</h1>
+  <p id="where" class="small"></p>
+  <a id="go" class="btn primary" href="./" data-en="Open SamePlate" data-es="Abrir SamePlate">Open SamePlate</a>
+  <a id="here" class="btn ghost" href="./" hidden data-en="I already use SamePlate on this phone: move my plan" data-es="Ya uso SamePlate en este teléfono: llevar mi plan">I already use SamePlate on this phone: move my plan</a>
+  <p class="small" data-en="Everybody eats!" data-es="¡Todos a comer!">Everybody eats!</p>
+</main>
+<script>
+  (function () {
+    var to = '';
+    var es = /^es\b/i.test(navigator.language || '');
+    document.documentElement.lang = es ? 'es' : 'en';
+    document.querySelectorAll('[data-en]').forEach(function (el) { el.textContent = el.getAttribute(es ? 'data-es' : 'data-en'); });
+    if (!to || to.indexOf('%') === 0) return; // not moving: just a link to the app
+    var host = to; try { host = new URL(to).host; } catch (e) {}
+    document.getElementById('go').href = to;
+    document.getElementById('where').textContent = host;
+    document.getElementById('here').hidden = false;
+  })();
+</script>
+</body>
+</html>
