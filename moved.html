@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>SamePlate has moved</title>
-<!-- Not linked from anywhere yet. The build fills  from VITE_MOVED_TO (empty = not moving).
+<!-- Not linked from anywhere yet. The build fills https://sameplate.sponsorstrike.com/ from VITE_MOVED_TO (empty = not moving).
      Families who already use SamePlate on this phone must open the app at THIS address once to carry their plan
      over (the "Move my family's plan" banner); a plain redirect would leave their plan behind. -->
 <style>
@@ -28,7 +28,7 @@
 </main>
 <script>
   (function () {
-    var to = '';
+    var to = 'https://sameplate.sponsorstrike.com/';
     var es = /^es\b/i.test(navigator.language || '');
     document.documentElement.lang = es ? 'es' : 'en';
     document.querySelectorAll('[data-en]').forEach(function (el) { el.textContent = el.getAttribute(es ? 'data-es' : 'data-en'); });
